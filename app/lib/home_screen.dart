@@ -8,6 +8,8 @@ import 'gps_tracker.dart';
 import 'models.dart';
 import 'pin_screen.dart';
 import 'steps_service.dart';
+import 'widgets/quest_card.dart';
+import 'widgets/status_tabs.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -258,28 +260,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<String>(
-              showSelectedIcon: false,
-              style: SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-              segments: [
-                for (final s in ['available', 'ongoing', 'completed'])
-                  ButtonSegment(
-                    value: s,
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text('${s[0].toUpperCase()}${s.substring(1)} '
-                          '${_quests.where((q) => q.status == s).length}'),
-                    ),
-                  ),
-              ],
-              selected: {_filter},
-              onSelectionChanged: (sel) => setState(() => _filter = sel.first),
-            ),
+          child: StatusTabs(
+            selected: _filter,
+            counts: {for (final s in StatusTabs.statuses) s: _quests.where((q) => q.status == s).length},
+            onChanged: (s) => setState(() => _filter = s),
           ),
         ),
         if (_error != null)
@@ -296,11 +280,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(8),
                     children: [
                       if (shown.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Center(child: Text('No quests here.')),
-                        ),
-                      for (final q in shown) _questCard(q),
+                        const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('No quests here.'))),
+                      for (final q in shown) _cardFor(q),
                     ],
                   ),
                 ),
@@ -309,179 +290,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _questCard(Quest q) {
+  /// Connects one QuestCard to this screen's state and actions.
+  Widget _cardFor(Quest q) {
     final tracking = _tracker.isTracking && _tracker.questId == q.id;
-    final distance = tracking ? _tracker.distanceM : q.distanceM;
-    final steps = _liveSteps[q.id] ?? q.steps;
-    final ongoing = q.status == 'ongoing';
-    // Live % while ongoing (display only). Café part uses the server's view of the saved pin.
-    final cafeOk = q.cafe != null && q.pin != null &&
-        haversineM(q.pin!['lat'], q.pin!['lng'], q.cafe!.lat, q.cafe!.lng) <= q.cafe!.radiusM;
-    final pct = ongoing ? progressPct(q, distanceM: distance, steps: steps, cafeOk: cafeOk) : q.progressPct;
-    final busy = _busy.contains(q.id);
-    final text = Theme.of(context).textTheme;
-    final err = Theme.of(context).colorScheme.error;
-    final stepsProblem = _stepsProblem[q.id];
-
-    final scheme = Theme.of(context).colorScheme;
-    final isRun = q.type == 'run';
-    final accent = isRun ? const Color(0xFF2E7D6B) : const Color(0xFF9A5B2E); // run = teal, café = coffee
-    final muted = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-
-    Widget req(IconData icon, String label) => Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Row(children: [
-            Icon(icon, size: 18, color: accent),
-            const SizedBox(width: 8),
-            Expanded(child: Text(label, style: text.bodyMedium)),
-          ]),
-        );
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: accent.withValues(alpha: 0.12),
-              child: Icon(isRun ? Icons.directions_run : Icons.local_cafe, color: accent),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(q.title, style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                Text(q.id, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, letterSpacing: 0.8)),
-              ]),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4D6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('+${q.xp} XP',
-                  style: text.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: const Color(0xFF8A6100))),
-            ),
-          ]),
-          if (q.description.isNotEmpty) Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(q.description, style: muted),
-          ),
-          const SizedBox(height: 4),
-          if (q.targetDistanceM != null)
-            req(Icons.straighten, '${q.targetDistanceM!.toStringAsFixed(0)} m GPS distance'),
-          if (q.targetSteps != null) req(Icons.directions_walk, '${q.targetSteps} steps during the quest'),
-          if (q.cafe != null)
-            req(Icons.place, 'Check in within ${q.cafe!.radiusM.toStringAsFixed(0)} m of the café'),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: pct / 100,
-                  minHeight: 8,
-                  color: accent,
-                  backgroundColor: accent.withValues(alpha: 0.12),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text('$pct%', style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          ]),
-          if (q.status != 'available' && q.needsTracking)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('Distance: ${distance.toStringAsFixed(0)} / ${q.targetDistanceM!.toStringAsFixed(0)} m'),
-            ),
-          if (ongoing && q.targetSteps != null) ...[
-            Text('Steps (Health Connect): ${_liveSteps[q.id] ?? '—'} / ${q.targetSteps}'),
-            if (_liveSteps[q.id] == 0)
-              Text('No steps recorded yet. Make sure Samsung Health syncs to Health Connect.',
-                  style: TextStyle(color: err, fontSize: 12)),
-            if (stepsProblem != null) Text(stepsProblem.problem!, style: TextStyle(color: err, fontSize: 12)),
-          ],
-          if (ongoing && q.cafe != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(q.pin == null
-                  ? 'Café pin: not confirmed'
-                  : 'Café pin: saved (±${(q.pin!['accuracyM'] as num).toStringAsFixed(0)} m, '
-                      '${cafeOk ? 'inside' : 'outside'} café area)'),
-            ),
-          if (tracking) _trackingPanel(),
-          if (ongoing && pct >= 100)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text('Targets reached. Tap Validate: it stays Ongoing until the server confirms.'),
-            ),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 4, children: _buttons(q, tracking, busy, stepsProblem)),
-        ]),
-      ),
+    final problem = _stepsProblem[q.id];
+    return QuestCard(
+      quest: q,
+      tracker: tracking ? _tracker : null,
+      liveSteps: _liveSteps[q.id],
+      stepsProblem: problem?.problem,
+      canInstallHealthConnect: problem?.canInstall == true,
+      busy: _busy.contains(q.id),
+      onAccept: () => _accept(q),
+      onStartTracking: () => _startTracking(q),
+      onStopTracking: _stopTracking,
+      onRefreshSteps: () => _refreshSteps(q),
+      onInstallHealthConnect: _stepsService.installHealthConnect,
+      onOpenPin: () => _openPin(q),
+      onValidate: () => _validate(q),
     );
-  }
-
-  Widget _trackingPanel() {
-    final f = _tracker.lastFix;
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('● Tracking (keep the app open)', style: TextStyle(fontWeight: FontWeight.bold)),
-        Text('Fixes: ${_tracker.fixCount} accepted · ${_tracker.rejectedCount} rejected'
-            '${_tracker.mockedCount > 0 ? ' · ${_tracker.mockedCount} mocked' : ''}'),
-        if (f != null) Text('Last fix accuracy: ${f.accuracy.toStringAsFixed(0)} m'),
-        if (_tracker.message != null)
-          Text(_tracker.message!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-      ]),
-    );
-  }
-
-  List<Widget> _buttons(Quest q, bool tracking, bool busy, StepsResult? stepsProblem) {
-    switch (q.status) {
-      case 'available':
-        return [
-          FilledButton(onPressed: busy ? null : () => _accept(q), child: const Text('Accept / Start')),
-        ];
-      case 'ongoing':
-        return [
-          if (q.needsTracking && tracking)
-            OutlinedButton(onPressed: _stopTracking, child: const Text('Stop tracking')),
-          if (q.needsTracking && !tracking)
-            OutlinedButton(
-              onPressed: busy ? null : () => _startTracking(q),
-              child: Text(q.distanceM > 0 ? 'Resume tracking' : 'Start tracking'),
-            ),
-          if (q.targetSteps != null)
-            TextButton(onPressed: busy ? null : () => _refreshSteps(q), child: const Text('Refresh steps')),
-          if (stepsProblem?.canInstall == true)
-            TextButton(onPressed: _stepsService.installHealthConnect, child: const Text('Get Health Connect')),
-          if (q.cafe != null)
-            OutlinedButton.icon(
-              onPressed: busy ? null : () => _openPin(q),
-              icon: const Icon(Icons.push_pin),
-              label: Text(q.pin == null ? 'Confirm location' : 'Re-confirm location'),
-            ),
-          FilledButton(
-            onPressed: busy ? null : () => _validate(q),
-            child: Text(busy ? 'Validating…' : 'Validate'),
-          ),
-        ];
-      default:
-        return [const Chip(label: Text('Completed ✓'))];
-    }
   }
 }

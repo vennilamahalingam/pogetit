@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoGetIt Code Walkthrough</title>
+<style>
+:root{--bg:#f4f6f8;--panel:#ffffff;--ink:#1b2b27;--muted:#5b6b67;--line:#dde3e1;--accent:#2e7d6b;--accent-bg:#e1f5ee;--code-bg:#0f1b19;--code-ink:#d7f0e8;--warn:#9a5b2e;--warn-bg:#faeee2;--bad:#a32d2d;--bad-bg:#fcebeb;--ok:#2f6b12;--ok-bg:#eaf3de}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#101615;--panel:#18211f;--ink:#e6efec;--muted:#9fb0ab;--line:#2a3633;--accent:#5dcaa5;--accent-bg:#11322a;--code-bg:#0a1110;--code-ink:#d7f0e8;--warn:#f0b27a;--warn-bg:#3a2616;--bad:#f09595;--bad-bg:#3a1717;--ok:#a8d878;--ok-bg:#1d2e10}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+header h1{font-size:20px;margin:0}header span{color:var(--muted);font-size:14px}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;aspect-ratio:16/9;min-height:460px;padding:28px 34px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.kicker{font-size:13px;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;margin:0 0 4px}
+.stage h2{font-size:28px;margin:0 0 14px;line-height:1.25}
+.body{flex:1;overflow:auto;display:grid;gap:16px;align-content:start}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px}
+pre{margin:0;background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:14px 16px;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;overflow:auto;white-space:pre}
+.ref{font:12px ui-monospace,Consolas,monospace;color:var(--muted);margin:4px 0 0}
+ul.edge{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+ul.edge li{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px;line-height:1.5}
+ul.edge b{font-weight:600}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px;margin-right:6px;vertical-align:1px}
+.t-ok{background:var(--ok-bg);color:var(--ok)}.t-bad{background:var(--bad-bg);color:var(--bad)}.t-warn{background:var(--warn-bg);color:var(--warn)}.t-acc{background:var(--accent-bg);color:var(--accent)}
+.flow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.flow div{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px;text-align:center}
+.flow div b{display:block;color:var(--accent);font-size:15px}
+.big{font-size:20px;line-height:1.5}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}
+.sub{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-height:72px;font-size:16px;line-height:1.55}
+.sub small{display:block;color:var(--muted);font-size:12px;margin-bottom:2px}
+.bar{height:6px;background:var(--line);border-radius:6px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s linear}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+button,select{font:inherit;font-size:14px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ctrl label{font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.counter{margin-left:auto;color:var(--muted);font-size:14px}
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.toc button{font-size:12px;padding:4px 10px}.toc button.on{border-color:var(--accent);color:var(--accent)}
+.fade{animation:fade .45s ease}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (max-width:820px){.stage{aspect-ratio:auto;padding:18px}.cols{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}.stage h2{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>PoGetIt: code walkthrough</h1><span>Quest flow, validation and edge cases, with file:line references for developers</span></header>
+
+<div class="stage"><div id="scene" class="fade"></div></div>
+<div class="sub"><small>Narration</small><span id="subtitle"></span></div>
+<div class="bar"><i id="prog"></i></div>
+<div class="ctrl">
+  <button id="prev" aria-label="Previous scene">&#9664; Prev</button>
+  <button id="play" class="primary">&#9654; Play</button>
+  <button id="next" aria-label="Next scene">Next &#9654;</button>
+  <label><input type="checkbox" id="voice" checked> Voice narration</label>
+  <label>Speed <select id="rate"><option value="0.9">0.9x</option><option value="1" selected>1x</option><option value="1.15">1.15x</option><option value="1.3">1.3x</option></select></label>
+  <span class="counter" id="counter"></span>
+</div>
+<div class="toc" id="toc"></div>
+</div>
+
+<!-- Code snippets kept as raw text (copied from the repo) -->
+<script type="text/plain" id="c-auth">def get_current_uid(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Missing 'Authorization: Bearer <Firebase ID token>' header.")
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        decoded = auth.verify_id_token(token)
+    except Exception:
+        raise HTTPException(401, "Invalid or expired Firebase ID token. Sign in again.")
+    return decoded["uid"]</script>
+<script type="text/plain" id="c-accept">p = load_progress(db, uid, quest_id)
+status = (p or {}).get("status", "available")
+if status == "completed":
+    raise HTTPException(409, "Quest already completed.")
+if status == "ongoing":  # idempotent: accepting twice keeps the original start time
+    return progress_view(p)
+now = datetime.now(timezone.utc)          # SERVER clock
+data = {"status": "ongoing", "acceptedAt": now, "startedAt": now,
+        "distanceM": 0, "steps": 0, "progressPct": 0, "lastSnapshotAt": now,
+        "route": {"fixCount": 0, "rejectedCount": 0, "mockedCount": 0}}
+progress_ref(db, uid, quest_id).set(data)</script>
+<script type="text/plain" id="c-gps">void _onFix(Position p) {
+  lastFix = p;
+  if (p.isMocked) { mockedCount++; ...; return; }              // dropped + flagged
+  if (p.accuracy > AppConfig.maxAccuracyM) { rejectedCount++; ...; return; }  // > 30 m
+  final a = _anchor;
+  if (a != null) {
+    final d = haversineM(a.latitude, a.longitude, p.latitude, p.longitude);
+    final dtS = p.timestamp.difference(a.timestamp).inMilliseconds / 1000;
+    if (dtS <= 0) return;                                       // duplicate / out-of-order
+    if (d / dtS > AppConfig.maxSpeedMps) { rejectedCount++; return; } // jump, keep old anchor
+    distanceM += d;
+  }
+  _anchor = p; fixCount++; _lastAcceptedAt = DateTime.now();
+}</script>
+<script type="text/plain" id="c-steps">final status = await _health.getHealthConnectSdkStatus();
+if (status == HealthConnectSdkStatus.sdkUnavailable) -> fail('not available', canInstall)
+if (status == ...ProviderUpdateRequired)              -> fail('needs an update', canInstall)
+granted = await _health.hasPermissions([STEPS], permissions: [READ]) ?? false;
+if (!granted && askPermission) granted = await _health.requestAuthorization(...);
+if (!granted) -> fail('Step permission denied ...')
+
+// aggregated total = de-duplicated across phone + watch; manual entries excluded
+final total = await _health.getTotalStepsInInterval(start, end, includeManualEntry: false);</script>
+<script type="text/plain" id="c-pct">def progress_pct(requirements, distance_m=0, steps=0, cafe_ok=False) -> int:
+    ratios = []
+    if requirements.get("distanceM"):
+        ratios.append(min(distance_m / requirements["distanceM"], 1.0))
+    if requirements.get("steps"):
+        ratios.append(min(steps / requirements["steps"], 1.0))
+    if requirements.get("cafe"):
+        ratios.append(1.0 if cafe_ok else 0.0)      # café is binary
+    if not ratios:
+        return 0
+    return math.floor(sum(ratios) / len(ratios) * 100 + 0.5)   # round half up</script>
+<script type="text/plain" id="c-evidence">POST /quests/CAFE-02/validate
+Authorization: Bearer <Firebase ID token>
+{
+  "distanceM": 540.2,
+  "route":   { "fixCount": 212, "rejectedCount": 9, "mockedCount": 0 },
+  "steps":   { "count": 710, "windowStart": 1795000000000, "windowEnd": 1795000840000 },
+  "freshFix":{ "lat": 51.51365, "lng": -0.09845, "accuracyM": 12,
+               "timestamp": 1795000830000, "isMocked": false }
+}
+// "steps": null when Health Connect gave no reading -> never substituted</script>
+<script type="text/plain" id="c-gate14">status = (progress or {}).get("status", "available")
+if status == "completed":
+    return ValidationResult(False, ["Quest already completed. ..."], already_completed=True)
+if status != "ongoing":
+    return ValidationResult(False, ["Quest has not been started. ..."])
+...
+def in_window(ts): return started - skew_ms <= ts <= now_ms + skew_ms   # skew = 30 s
+if not in_window(fix["timestamp"]): reasons.append("...outside the quest time window.")
+age_s = (now_ms - fix["timestamp"]) / 1000
+if age_s > cfg.MAX_FIX_AGE_S: reasons.append("GPS fix is stale ...")        # 120 s
+if fix["accuracyM"] > cfg.MAX_ACCURACY_M: reasons.append("...too inaccurate")  # 30 m
+if fix.get("isMocked"): reasons.append("Mock location detected ...")
+if route.get("mockedCount", 0) > 0: reasons.append("Mock locations detected during the route")</script>
+<script type="text/plain" id="c-gate57">if req.get("distanceM"):
+    if dist < target:                        -> "Distance X m is below the target"
+    elif route.get("fixCount", 0) < 2:       -> "reported without a GPS route"
+    elif dist / elapsed_s > MAX_AVG_SPEED:   -> "Implausible average speed"   # 8 m/s
+if req.get("steps"):
+    if steps_ev is None:                     -> "No step data was provided"
+    elif steps_ev["count"] < target:         -> "Steps X are below the target"
+if cafe:
+    if haversine(fix, cafe) > radius:        -> "You are X m from the café"
+    if not pin:                              -> "No confirmed pin"
+    else: pin mocked / pin accuracy > 30 / pin outside window /
+          haversine(pin, fix) > radius       -> each adds its own reason
+return ValidationResult(passed=not reasons, reasons=reasons, remaining=remaining)</script>
+<script type="text/plain" id="c-tx">@firestore.transactional
+def _complete_once(transaction, prog_ref, user_ref, val_ref, xp, record) -> bool:
+    snap = prog_ref.get(transaction=transaction)          # re-read INSIDE the transaction
+    if not snap.exists or snap.to_dict().get("status") != "ongoing":
+        return False                                      # someone else already completed it
+    now = datetime.now(timezone.utc)
+    transaction.update(prog_ref, {"status": "completed", "progressPct": 100, "completedAt": now})
+    transaction.set(user_ref, {"xp": firestore.Increment(xp)}, merge=True)
+    transaction.set(val_ref, {**record, "xpAwarded": xp, "createdAt": now})
+    return True
+
+# in validate():
+if result.passed:
+    granted = _complete_once(db.transaction(), ...)
+    if not granted: result = "Quest already completed. XP was already awarded."
+else:
+    val_ref.set({**record, "result": "fail", "xpAwarded": 0, ...})   # audit trail</script>
+
+<script>
+const code = id => '<pre>' + document.getElementById(id).textContent
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+const ref = t => `<p class="ref">${t}</p>`;
+const edges = items => '<ul class="edge">' + items.map(([tag, cls, txt]) =>
+  `<li><span class="tag ${cls}">${tag}</span>${txt}</li>`).join('') + '</ul>';
+
+const SCENES = [
+{k:'Overview', t:'The phone collects evidence. The server decides.',
+ html:`<div class="big">A Flutter Android app measures <b>GPS distance</b>, <b>Health Connect steps</b> and a <b>café pin</b>.
+ A FastAPI backend checks that evidence with pure rule functions and, only on a pass, completes the quest and grants XP inside <b>one Firestore transaction</b>.</div>
+ <div class="flow"><div><b>1 Load</b>GET /quests</div><div><b>2 Accept</b>POST /accept</div><div><b>3 Track</b>GPS + steps</div><div><b>4 Pin</b>POST /pin</div><div><b>5 Validate</b>POST /validate</div><div><b>6 Decide</b>rules.py + transaction</div></div>
+ <div>${edges([['Rule','t-acc','XP, <code>completed</code> status and validation records are written only by the backend. Progress % on the phone is display only.']])}</div>`,
+ say:'PoGetIt has one big idea. The phone collects evidence, and the server decides. The app measures GPS distance, Health Connect steps and a café pin. The backend checks that evidence with pure rule functions, and only on a pass does it complete the quest and grant XP, inside one Firestore transaction. Six steps: load, accept, track, pin, validate, decide.'},
+
+{k:'Repo map', t:'Where everything lives',
+ html:`<div class="cols"><table><tr><th>Backend (FastAPI)</th><th>Job</th></tr>
+ <tr><td><code>app/auth.py</code></td><td>Verify Firebase ID token → uid</td></tr>
+ <tr><td><code>app/rules.py</code></td><td>Pure validation + progress % (no DB)</td></tr>
+ <tr><td><code>app/routes/quests.py</code></td><td>Endpoints, Firestore reads/writes, XP transaction</td></tr>
+ <tr><td><code>app/models.py</code></td><td>Request shapes (Fix, ValidateRequest…)</td></tr>
+ <tr><td><code>app/config.py</code></td><td>Thresholds from .env (30 m, 120 s, 30 s, 8 m/s)</td></tr>
+ <tr><td><code>seed.py</code></td><td>4 quests; <code>--cafe1/--cafe2</code></td></tr>
+ <tr><td><code>tests/test_rules.py</code></td><td>14 pytest cases</td></tr></table>
+ <table><tr><th>App (Flutter)</th><th>Job</th></tr>
+ <tr><td><code>lib/main.dart</code></td><td>Firebase init + anonymous sign-in</td></tr>
+ <tr><td><code>lib/api.dart</code></td><td>HTTP + token + readable errors</td></tr>
+ <tr><td><code>lib/models.dart</code></td><td>Quest model, display %</td></tr>
+ <tr><td><code>lib/gps_tracker.dart</code></td><td>Filtering, distance, fresh fix</td></tr>
+ <tr><td><code>lib/steps_service.dart</code></td><td>Health Connect steps</td></tr>
+ <tr><td><code>lib/pin_screen.dart</code></td><td>Café check-in preview</td></tr>
+ <tr><td><code>lib/home_screen.dart</code></td><td>Tabs, cards, accept, validate</td></tr></table></div>`,
+ say:'Here is the map. On the backend, auth dot py verifies the token, rules dot py holds all the decision logic with no database, and routes slash quests dot py does the Firestore reads and writes, including the XP transaction. Thresholds live in config dot py. On the app side, gps tracker does the filtering, steps service talks to Health Connect, pin screen does the café check-in, and home screen ties it together.'},
+
+{k:'Step 0 · Auth', t:'Every request is tied to a verified uid',
+ html:`<div class="cols"><div>${code('c-auth')}${ref('backend/app/auth.py:12 · get_current_uid')}</div>
+ <div>${edges([
+ ['Edge','t-warn','No header or not "Bearer …" → <b>401</b> with a readable message.'],
+ ['Edge','t-warn','Expired token → 401. The app refreshes the token once and retries: <code>app/lib/api.dart:40</code>.'],
+ ['Why','t-acc','The uid comes from the verified token, never from the body, so nobody can act on another user\'s progress or XP.'],
+ ['Edge','t-warn','Sign-in fails at launch (offline) → error screen with Retry: <code>app/lib/main.dart:43</code>.']])}</div></div>`,
+ say:'Before anything else, every request is tied to a user. The app signs in anonymously with Firebase and sends the ID token. auth dot py, line 12, verifies it and returns the uid. The uid is never taken from the request body. A missing or expired token gives a 401, and the app refreshes the token once and retries, in api dot dart line 40.'},
+
+{k:'Step 1 · Load', t:'GET /quests merges definitions with your progress',
+ html:`<div class="cols"><div>${edges([
+ ['Flow','t-acc','Creates <code>users/{uid}</code> with <code>xp: 0</code> on first call.'],
+ ['Flow','t-acc','Reads active quests + <code>users/{uid}/questProgress/*</code> and merges them.'],
+ ['Edge','t-warn','No progress doc for a quest → shown as <b>available, 0%</b> (<code>progress_view</code>, quests.py:45).'],
+ ['Edge','t-warn','Backend unreachable → banner "Can\'t reach the server…" + Retry (<code>api.dart:41</code>).'],
+ ['Rule','t-acc','Targets and XP come from Firestore data (seed.py), never from app code.']])}</div>
+ <div>${ref('backend/app/routes/quests.py:67 · list_quests')}${ref('app/lib/home_screen.dart:52 · _load')}${ref('app/lib/models.dart · Quest.fromJson')}
+ <p style="margin-top:12px">On load, ongoing step quests also refresh their Health Connect steps <i>without</i> a permission popup (<code>home_screen.dart:65</code>).</p></div></div>`,
+ say:'Step one, load. GET slash quests creates the user record with zero XP on the first call, then merges every active quest with this user\'s progress. A quest with no progress record is simply available at zero percent. If the server is unreachable, the app shows a banner with a retry button. All targets and XP come from Firestore data, never from code.'},
+
+{k:'Step 2 · Accept', t:'Available → Ongoing, timed by the server',
+ html:`<div class="cols"><div>${code('c-accept')}${ref('backend/app/routes/quests.py:87 · accept_quest')}</div>
+ <div>${edges([
+ ['Why','t-acc','<code>startedAt</code> uses the <b>server clock</b>, so the phone cannot backdate the quest window.'],
+ ['Edge','t-warn','Accept twice (double tap) → idempotent, keeps the original start time.'],
+ ['Edge','t-warn','Accept a completed quest → <b>409</b> "Quest already completed".'],
+ ['Edge','t-warn','Inactive quest → 409.'],
+ ['Rule','t-bad','Never awards XP.'],
+ ['App','t-acc','After accept: asks step permission once, then starts GPS for distance quests (<code>home_screen.dart:111</code>).']])}</div></div>`,
+ say:'Step two, accept. The server moves the quest from available to ongoing and sets started at using the server clock, so the phone can never backdate the window. Accepting twice is harmless, it keeps the original start time. Accepting a completed quest returns 409. And accept never awards XP. On the app, accept then asks for step permission once and starts GPS tracking for distance quests.'},
+
+{k:'Step 3a · GPS', t:'Distance = haversine sum of accepted fixes',
+ html:`<div class="cols"><div>${code('c-gps')}${ref('app/lib/gps_tracker.dart:114 · _onFix')}</div>
+ <div>${edges([
+ ['Drop','t-bad','<b>Mocked</b> fix → ignored, <code>mockedCount++</code> (server fails the quest later).'],
+ ['Drop','t-bad','<b>Accuracy &gt; 30 m</b> → ignored, <code>rejectedCount++</code>.'],
+ ['Drop','t-bad','<b>Jump &gt; 8 m/s</b> → ignored but the old anchor is kept, so real movement is accepted again later.'],
+ ['Edge','t-warn','<code>dtS &lt;= 0</code> (duplicate/out-of-order) → skipped.'],
+ ['Edge','t-warn','No accepted fix for 20 s → "Weak GPS signal (indoors?)" (line 105).'],
+ ['Edge','t-warn','GPS off / permission denied / blocked forever → specific message (<code>checkLocationReady</code>, line 19); GPS switched off mid-run → stops and asks to resume (line 150).']])}</div></div>`,
+ say:'Step three, tracking. Distance is the sum of haversine distances between accepted fixes, in gps tracker dot dart line 114. A fix is dropped if it is mocked, if its accuracy is worse than 30 metres, or if the implied speed from the last good fix is over 8 metres per second, which is a GPS jump. On a jump we keep the old anchor, so real movement is accepted again a few fixes later. If no good fix arrives for 20 seconds, the user sees a weak signal warning.'},
+
+{k:'Step 3b · Steps', t:'Health Connect aggregated steps, never invented',
+ html:`<div class="cols"><div>${code('c-steps')}${ref('app/lib/steps_service.dart:29 · ensureReady   :57 · stepsBetween')}</div>
+ <div>${edges([
+ ['Why','t-acc','<b>Aggregated</b> total de-duplicates overlapping sources (phone + watch) instead of summing raw records.'],
+ ['Edge','t-warn','Health Connect not installed / needs update → message + "Get Health Connect" button.'],
+ ['Edge','t-warn','Permission denied → message that says where to allow "Steps".'],
+ ['Edge','t-warn','Zero steps → "No steps recorded yet… Samsung Health sync" (it\'s real data, shown as 0).'],
+ ['Edge','t-warn','Manual step entries excluded (<code>includeManualEntry: false</code>).'],
+ ['Rule','t-bad','On any failure <code>steps</code> is <b>null</b>, never a guessed number.']])}</div></div>`,
+ say:'Steps come from Android Health Connect, in steps service dot dart. We read the aggregated total for the quest window, which removes double counting between phone and watch, and we exclude manually typed steps. If Health Connect is missing, needs an update, or permission is denied, the user gets a specific message. If anything fails, steps stays null. We never invent or substitute a number.'},
+
+{k:'Step 3c · Progress', t:'Snapshots and the progress formula',
+ html:`<div class="cols"><div>${code('c-pct')}${ref('backend/app/rules.py:30 · progress_pct')}</div>
+ <div>${edges([
+ ['Example','t-acc','500/1000 m and 600/1200 steps → (0.5 + 0.5)/2 = <b>50%</b> (unit-tested).'],
+ ['Flow','t-acc','Every 15 s: POST /progress with distance, steps, route counts (<code>home_screen.dart:144</code>, <code>quests.py:108</code>).'],
+ ['Rule','t-bad','/progress never completes a quest. 100% stays <b>Ongoing</b> until /validate passes.'],
+ ['Edge','t-warn','<code>steps: null</code> in a snapshot → server keeps the previous value.'],
+ ['Edge','t-warn','App restart mid-quest → Resume restores distance <b>and</b> fix counts, including <code>mockedCount</code> (<code>gps_tracker.dart:79</code>), so a restart can\'t wipe a mock flag.']])}</div></div>`,
+ say:'Progress is the average of each requirement\'s ratio, capped at one, times 100. 500 of 1000 metres and 600 of 1200 steps gives exactly 50 percent. Café check-in counts as zero or one. While tracking, the app saves a snapshot every 15 seconds. This is only for recovery after a restart. It restores distance and fix counts, including mocked fixes. A snapshot never completes a quest, even at 100 percent.'},
+
+{k:'Step 4 · Pin', t:'A pin is a claim, not proof',
+ html:`<div class="cols"><div>${edges([
+ ['Flow','t-acc','Pin screen gets a fresh fix and previews coordinates, ±accuracy, fix time and distance to café (<code>pin_screen.dart:32</code>).'],
+ ['Flow','t-acc','"Confirm pin here" → POST /pin with lat, lng, accuracyM, timestamp, isMocked (<code>quests.py:126</code>).'],
+ ['Edge','t-warn','Quest has no café → <b>400</b>. Quest not ongoing → <b>409</b>.'],
+ ['Edge','t-warn','No fix in 25 s → "move outside and try again" (<code>getFreshFix</code>, gps_tracker.dart:37).'],
+ ['Edge','t-warn','Mocked or inaccurate preview → warned on screen, and rejected later by the server.'],
+ ['Edge','t-warn','Café coordinates re-seeded after pinning → re-confirm the pin.']])}</div>
+ <div class="big">The server stores the pin, but <b>trusts nothing yet</b>. At validation it must match a <b>new</b> fresh fix, and that fix must be inside the café radius.</div></div>`,
+ say:'Step four, the café pin. The pin screen grabs a fresh GPS fix and shows coordinates, accuracy and the distance to the café. Confirming saves it with POST slash pin. A quest without a café returns 400, and a quest that is not ongoing returns 409. The key point: a pin alone is not proof of presence. At validation, the server compares it with a brand new fix.'},
+
+{k:'Step 5 · Validate', t:'The evidence the app sends',
+ html:`<div class="cols"><div>${code('c-evidence')}${ref('app/lib/home_screen.dart:166 · _validate')}</div>
+ <div>${edges([
+ ['Flow','t-acc','1) fresh GPS fix, 2) Health Connect steps for <code>[startedAt, now]</code>, 3) distance + route counts (live tracker or saved snapshot).'],
+ ['Edge','t-warn','No fresh fix (GPS off, indoors) → stops before calling the server, with a clear message.'],
+ ['Edge','t-warn','Double tap → button is disabled while busy (<code>_withBusy</code>, line 79). The server is the real guard.'],
+ ['Edge','t-warn','Validation fails → tracking keeps running so the user can carry on.']])}</div></div>`,
+ say:'Step five, validate. The app collects three things: a fresh GPS fix, the Health Connect step total for the quest window, and the distance with its route summary. Then it posts them to slash validate. If no fresh fix can be obtained, it stops early with a clear message. The button is disabled while a request is in flight, but the real protection is on the server.'},
+
+{k:'Step 6 · Decide (1/2)', t:'Checks 1–4: state, time, freshness, accuracy',
+ html:`<div class="cols"><div>${code('c-gate14')}${ref('backend/app/rules.py:64 · validate_quest   (gates at :67, :90, :99, :104)')}</div>
+ <div>${edges([
+ ['1','t-acc','Not found / inactive / not ongoing → returns <b>immediately</b>. <code>completed</code> → "already completed", no XP.'],
+ ['2','t-acc','Fix, pin and step-window timestamps must be inside <code>[startedAt − 30 s, now + 30 s]</code> (clock skew allowance).'],
+ ['3','t-acc','Fix older than <b>120 s</b> by <b>server</b> time → stale.'],
+ ['4','t-acc','Accuracy &gt; 30 m, <code>isMocked</code>, or any mocked fix on the route → fail.'],
+ ['Design','t-ok','After gate 1, reasons are <b>collected</b>, not returned early, so the user sees everything wrong at once.']])}</div></div>`,
+ say:'Step six, the decision, in rules dot py, validate quest, line 64. Gate one checks the quest exists, is active and is ongoing. This one stops immediately. Gate two checks every timestamp falls inside the quest window, with 30 seconds of clock skew allowed. Gate three says the fix must be at most 120 seconds old by server time. Gate four rejects accuracy worse than 30 metres and any mocked location. From here on, reasons are collected, not returned early.'},
+
+{k:'Step 6 · Decide (2/2)', t:'Checks 5–7: distance, steps, café geofence',
+ html:`<div class="cols"><div>${code('c-gate57')}${ref('backend/app/rules.py:113 distance · :128 steps · :138 geofence')}</div>
+ <div>${edges([
+ ['5','t-acc','Distance ≥ target, plus plausibility: ≥ 2 GPS fixes and average speed ≤ 8 m/s.'],
+ ['6','t-acc','Steps ≥ target. <code>null</code> steps = fail with "No step data", never zero-but-OK.'],
+ ['7','t-acc','Fresh fix within <b>radius</b> of café <b>and</b> pin within radius of the fresh fix; pin must be non-mocked, ≤ 30 m accuracy and inside the window.'],
+ ['Data','t-ok','Gates only run for requirements the quest has: RUN = 1–6, CAFE-01 = 1–4 + 7, CAFE-02 = all 7.'],
+ ['Output','t-ok','<code>remaining</code> list (e.g. steps 800 / 1200) for the app to display.']])}</div></div>`,
+ say:'Gate five checks distance against the target, plus two plausibility checks: at least two GPS fixes, and an average speed no faster than 8 metres per second. Gate six checks steps. Missing step data is a failure, never treated as fine. Gate seven, for café quests, needs the fresh fix inside the café radius and the saved pin close to the fresh fix. Gates run only for requirements the quest actually has, so there is no quest-specific code.'},
+
+{k:'XP integrity', t:'One transaction = XP exactly once',
+ html:`<div class="cols"><div>${code('c-tx')}${ref('backend/app/routes/quests.py:142 · _complete_once   :159 · validate')}</div>
+ <div>${edges([
+ ['Race','t-acc','Two validates at the same moment: both pass the rules, both enter the transaction. Firestore lets one commit; the other re-runs, sees <code>completed</code> and returns False → "already completed", 0 XP.'],
+ ['Atomic','t-ok','Status, XP increment and pass record are written together or not at all.'],
+ ['Fail','t-warn','Failed attempts write a <code>result: "fail"</code> record with reasons, outside the transaction (audit trail). Quest stays ongoing.'],
+ ['Tested','t-ok','Live run: 2 concurrent validates → +80 XP once, total 80.']])}</div></div>`,
+ say:'This is the XP integrity guarantee. On a pass, complete once runs inside a single Firestore transaction. It re-reads the status, and only if it is still ongoing does it set completed, increment XP and write the pass record, all together. If two validates race, Firestore re-runs the loser, which now sees completed and adds nothing. We tested this live: two simultaneous requests gave XP once. Failed attempts are recorded too, for the audit trail.'},
+
+{k:'Edge-case catalogue', t:'What can go wrong, and what the code does',
+ html:`<table><tr><th>Scenario</th><th>Where</th><th>Result</th></tr>
+ <tr><td>Location permission denied / blocked</td><td>gps_tracker.dart:19</td><td>Specific message, tracking not started</td></tr>
+ <tr><td>GPS turned off mid-run</td><td>gps_tracker.dart:150</td><td>Tracking stops, "turn it back on and Resume"</td></tr>
+ <tr><td>Indoors / weak signal</td><td>gps_tracker.dart:105, :122</td><td>Fixes rejected, warning after 20 s</td></tr>
+ <tr><td>Fake GPS app</td><td>gps_tracker.dart:116 · rules.py:108–111</td><td>Fixes dropped and counted; validation fails</td></tr>
+ <tr><td>Health Connect missing / denied / zero</td><td>steps_service.dart:29–48</td><td>Message, steps = null, validation fails with reason</td></tr>
+ <tr><td>Stale or inaccurate fresh fix</td><td>rules.py:99–107</td><td>Fail: "stale" / "too inaccurate"</td></tr>
+ <tr><td>Outside café radius / pin far from fix</td><td>rules.py:144, :162</td><td>Fail with distances in metres</td></tr>
+ <tr><td>100% but not validated</td><td>quests.py:108</td><td>Stays Ongoing (snapshot is informational)</td></tr>
+ <tr><td>Double tap / retry validate</td><td>quests.py:142</td><td>XP once; second gets "already completed"</td></tr>
+ <tr><td>App restart mid-quest</td><td>home_screen.dart:120 · gps_tracker.dart:79</td><td>Resume from saved distance + fix counts</td></tr>
+ <tr><td>Backend unreachable / token expired</td><td>api.dart:40–47</td><td>Readable error / one silent token refresh</td></tr></table>`,
+ say:'Here is the edge case catalogue, with file and line for each. Denied permissions, GPS switched off, weak indoor signal, fake GPS apps, Health Connect problems, stale or inaccurate fixes, being outside the café radius, a quest showing 100 percent but not validated, double taps, app restarts and an unreachable backend. Each one has a specific, readable outcome, and none of them can grant XP by accident.'},
+
+{k:'Known limits', t:'Honest limitations (for the reviewer)',
+ html:`${edges([
+ ['Trust','t-warn','Distance, route counts, steps and the fresh fix are <b>reported by the phone</b>. The server sanity-checks (fix count, average speed, freshness, geofence) but cannot prove them. Hardening: upload route points, App Check / Play Integrity.'],
+ ['GPS','t-warn','Indoors, accuracy is often &gt; 30 m, so check in near a window or door. Pin-vs-fix uses the 50 m radius, so two noisy fixes can disagree.'],
+ ['Tracking','t-warn','Foreground only: a locked screen or battery saver can pause GPS, so distance is under-counted.'],
+ ['Steps','t-warn','Samsung Health → Health Connect sync can lag a few minutes; tap Refresh steps before validating.'],
+ ['Network','t-warn','If /validate commits but the response times out, the retry shows "already completed". XP is still correct.'],
+ ['Accounts','t-warn','Anonymous auth: reinstalling creates a new uid (fresh quests).'],
+ ['Config','t-warn','Re-seeding changes targets/café for quests already ongoing. CAFE-02 step target (600) is an assumption.']])}`,
+ say:'Finally, the honest limitations. Distance, steps and the fresh fix are reported by the phone. The server sanity-checks them but cannot prove them. A production version would upload route points and use app attestation. Indoor accuracy is often worse than 30 metres. Tracking only runs in the foreground. Step sync can lag. And anonymous accounts reset on reinstall. These are known, documented, and out of scope for this prototype.'},
+
+{k:'Run it', t:'How to run and verify',
+ html:`<div class="cols"><div><pre>cd backend
+.\\.venv\\Scripts\\python -m pytest -q          # 14 rule tests
+.\\.venv\\Scripts\\python seed.py --cafe1 LAT,LNG --cafe2 LAT,LNG
+.\\.venv\\Scripts\\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+cd app
+flutter run --dart-define=API_BASE=https://&lt;your-backend&gt;</pre>
+ ${ref('backend/tests/test_rules.py · backend/seed.py · app/lib/config.dart (API_BASE)')}</div>
+ <div>${edges([
+ ['Pass','t-ok','CAFE-01: confirm pin within 50 m, Validate → +80 XP, moves to Completed.'],
+ ['Fail','t-bad','CAFE-01 without a pin → "No confirmed pin" + distance reason, stays Ongoing.'],
+ ['Fail','t-bad','RUN-01 at 500 m → distance + steps reasons, 50% bar, remaining list.'],
+ ['Audit','t-acc','Firestore <code>validations</code> holds every attempt with its reasons.']])}</div></div>`,
+ say:'To run it: the pytest suite covers the rules, the seed script sets the quests and café coordinates, and uvicorn starts the API. The app takes the backend address at build time. For a demo, show one pass, like CAFE-01 with a pin inside 50 metres, and one fail, like CAFE-01 without a pin, then show both records in the validations collection. That is the whole system.'}
+];
+
+let i = 0, playing = false, timer = null, tick = null, started = 0, dur = 1;
+const $ = id => document.getElementById(id);
+const synth = window.speechSynthesis;
+
+function render() {
+  const s = SCENES[i];
+  const el = $('scene');
+  el.className = ''; void el.offsetWidth; el.className = 'fade';
+  el.innerHTML = `<p class="kicker">${String(i + 1).padStart(2, '0')} · ${s.k}</p><h2>${s.t}</h2><div class="body">${s.html}</div>`;
+  $('subtitle').textContent = s.say;
+  $('counter').textContent = `Scene ${i + 1} of ${SCENES.length}`;
+  $('toc').innerHTML = SCENES.map((x, n) => `<button class="${n === i ? 'on' : ''}" data-n="${n}">${n + 1}. ${x.k}</button>`).join('');
+  $('toc').querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.n));
+  $('prog').style.width = '0%';
+}
+
+function stopTimers() { clearTimeout(timer); clearInterval(tick); try { synth && synth.cancel(); } catch (e) {} }
+
+function scheduleNext(seconds) {
+  dur = seconds; started = Date.now();
+  tick = setInterval(() => { $('prog').style.width = Math.min(100, (Date.now() - started) / (dur * 10)) + '%'; }, 200);
+  timer = setTimeout(() => next(true), seconds * 1000);
+}
+
+function playScene() {
+  stopTimers();
+  if (!playing) return;
+  const s = SCENES[i];
+  const rate = +$('rate').value;
+  const estimate = s.say.split(/\s+/).length / (2.6 * rate) + 1.5;
+  if ($('voice').checked && synth) {
+    const u = new SpeechSynthesisUtterance(s.say);
+    u.rate = rate; u.lang = 'en-US';
+    let done = false;
+    u.onend = () => { if (done || !playing) return; done = true; clearTimeout(timer); clearInterval(tick); $('prog').style.width = '100%'; timer = setTimeout(() => next(true), 1200); };
+    synth.speak(u);
+    dur = estimate; started = Date.now();
+    tick = setInterval(() => { $('prog').style.width = Math.min(98, (Date.now() - started) / (dur * 10)) + '%'; }, 200);
+    timer = setTimeout(() => { if (!done) { done = true; next(true); } }, (estimate + 8) * 1000);
+  } else {
+    scheduleNext(estimate);
+  }
+}
+
+function go(n) { i = Math.max(0, Math.min(SCENES.length - 1, n)); render(); playScene(); }
+function next(auto) {
+  if (i >= SCENES.length - 1) { if (auto) { playing = false; $('play').innerHTML = '&#9654; Replay'; stopTimers(); $('prog').style.width = '100%'; } return; }
+  go(i + 1);
+}
+$('next').onclick = () => go(i + 1);
+$('prev').onclick = () => go(i - 1);
+$('play').onclick = () => {
+  if (playing) { playing = false; stopTimers(); $('play').innerHTML = '&#9654; Play'; return; }
+  if (i === SCENES.length - 1 && $('play').textContent.includes('Replay')) i = 0, render();
+  playing = true; $('play').innerHTML = '&#10074;&#10074; Pause'; playScene();
+};
+$('voice').onchange = () => { if (playing) playScene(); };
+$('rate').onchange = () => { if (playing) playScene(); };
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') go(i + 1);
+  else if (e.key === 'ArrowLeft') go(i - 1);
+  else if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+});
+render();
+</script>
+</body>
+</html>
