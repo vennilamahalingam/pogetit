@@ -111,6 +111,10 @@ class GpsTracker extends ChangeNotifier {
     return null;
   }
 
+  /// Lets unit tests feed fixes directly (no real GPS needed).
+  @visibleForTesting
+  void handleFixForTest(Position p) => _onFix(p);
+
   void _onFix(Position p) {
     lastFix = p;
     if (p.isMocked) {
@@ -134,6 +138,18 @@ class GpsTracker extends ChangeNotifier {
         // Implausible jump. Keep the old anchor: as time passes the implied speed drops,
         // so real movement is accepted again on a later fix.
         rejectedCount++;
+        notifyListeners();
+        return;
+      }
+      // Drift filter: standing still, GPS still "wobbles" a few metres each fix.
+      // Only count a move that is bigger than the GPS uncertainty of the two fixes
+      // (or minMoveM, whichever is larger). Smaller changes are treated as noise:
+      // nothing is added and the anchor is NOT moved, so slow real walking still
+      // adds up once you are clearly away from the anchor.
+      final minMove = max(AppConfig.minMoveM, max(a.accuracy, p.accuracy));
+      if (d < minMove) {
+        _lastAcceptedAt = DateTime.now(); // good signal, just not moving
+        message = null;
         notifyListeners();
         return;
       }

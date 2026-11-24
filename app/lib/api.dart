@@ -31,7 +31,8 @@ class Api {
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json';
       if (body != null) req.body = jsonEncode(body);
-      return http.Response.fromStream(await _client.send(req).timeout(const Duration(seconds: 15)));
+      // 60 s: the free Render server sleeps when idle and needs ~50 s to wake on the first request.
+      return http.Response.fromStream(await _client.send(req).timeout(const Duration(seconds: 60)));
     }
 
     http.Response res;

@@ -10,6 +10,10 @@ class AppConfig {
   /// Implied speed between two fixes above this is an implausible jump (walking/jogging).
   static const maxSpeedMps = 8.0;
 
+  /// A move between fixes only counts if it is at least this far AND bigger than the
+  /// GPS accuracy of both fixes. Stops standing-still drift from adding fake distance.
+  static const minMoveM = 5.0;
+
   /// Ask Android for an update only after moving at least this far (reduces standing-still jitter).
   static const distanceFilterM = 5;
 
